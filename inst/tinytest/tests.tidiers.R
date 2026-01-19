@@ -7,25 +7,18 @@ if (requireNamespace("rstan", quietly = TRUE)) {
   # Test tidy.blavaan with Stan model
   tidy_stan <- tidy.blavaan(fitstan)
   expect_true(inherits(tidy_stan, "data.frame"))
-  expect_true("term" %in% names(tidy_stan))
-  expect_true("estimate" %in% names(tidy_stan))
-  expect_true("std.error" %in% names(tidy_stan))
-  expect_true("conf.low" %in% names(tidy_stan))
-  expect_true("conf.high" %in% names(tidy_stan))
-  expect_true("rhat" %in% names(tidy_stan))
-  expect_true("ess" %in% names(tidy_stan))
-  expect_true("prior" %in% names(tidy_stan))
+  expected_tidy_cols <- c("term", "estimate", "std.error", "conf.low",
+                          "conf.high", "rhat", "ess", "prior")
+  expect_true(all(expected_tidy_cols %in% names(tidy_stan)))
   expect_true(nrow(tidy_stan) > 0)
 
   # Test tidy without confidence intervals
   tidy_noci <- tidy.blavaan(fitstan, conf.int = FALSE)
-  expect_false("conf.low" %in% names(tidy_noci))
-  expect_false("conf.high" %in% names(tidy_noci))
+  expect_false(any(c("conf.low", "conf.high") %in% names(tidy_noci)))
 
   # Test tidy without rhat and ess
   tidy_nodiag <- tidy.blavaan(fitstan, rhat = FALSE, ess = FALSE)
-  expect_false("rhat" %in% names(tidy_nodiag))
-  expect_false("ess" %in% names(tidy_nodiag))
+  expect_false(any(c("rhat", "ess") %in% names(tidy_nodiag)))
 
   # Test tidy with standardized estimates
   tidy_std <- tidy.blavaan(fitstan, standardized = TRUE)
@@ -35,14 +28,9 @@ if (requireNamespace("rstan", quietly = TRUE)) {
   glance_stan <- glance.blavaan(fitstan)
   expect_true(inherits(glance_stan, "data.frame"))
   expect_equal(nrow(glance_stan), 1)
-  expect_true("npar" %in% names(glance_stan))
-  expect_true("nobs" %in% names(glance_stan))
-  expect_true("ngroups" %in% names(glance_stan))
-  expect_true("estimator" %in% names(glance_stan))
-  expect_true("nchains" %in% names(glance_stan))
-
-  # Check that fit measures are included
-  expect_true("ppp" %in% names(glance_stan) || "looic" %in% names(glance_stan))
+  expected_glance_cols <- c("npar", "nobs", "ngroups", "estimator", "nchains")
+  expect_true(all(expected_glance_cols %in% names(glance_stan)))
+  expect_true(any(c("ppp", "looic") %in% names(glance_stan)))
 
   # Test glance with fit indices (this is computationally expensive)
   # Only test if blavFitIndices works
