@@ -1,13 +1,13 @@
 # Tidy and glance methods for blavaan objects
 # Following broom ecosystem conventions for Bayesian models
 
-# Define tidy generic if not already available (e.g., from broom or generics)
-# This ensures the S3 method registration works even without those packages
+# Import generics from the generics package to ensure compatibility with broom
+#' @importFrom generics tidy glance
 #' @export
-tidy <- function(x, ...) UseMethod("tidy")
+generics::tidy
 
 #' @export
-glance <- function(x, ...) UseMethod("glance")
+generics::glance
 
 #' Tidy a blavaan object
 #'
@@ -42,12 +42,12 @@ glance <- function(x, ...) UseMethod("glance")
 #'
 #' @examples
 #' \dontrun{
-#' library(blavaan)
-#'
+#' data(HolzingerSwineford1939, package = "lavaan")
+#' 
 #' HS.model <- 'visual =~ x1 + x2 + x3'
 #' fit <- bcfa(HS.model, data = HolzingerSwineford1939, seed = 123)
 #' tidy(fit)
-#' tidy(fit, conf.int = TRUE, conf.level = 0.90)
+#' tidy(fit, conf.int = TRUE, conf.level = 0.95)
 #' tidy(fit, standardized = TRUE)
 #' }
 #'
