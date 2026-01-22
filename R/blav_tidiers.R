@@ -2,10 +2,11 @@
 # Following broom ecosystem conventions for Bayesian models
 
 # Import generics from the generics package to ensure compatibility with broom
-#' @importFrom generics tidy glance
+#' @importFrom generics tidy
 #' @export
 generics::tidy
 
+#' @importFrom generics glance
 #' @export
 generics::glance
 
