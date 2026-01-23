@@ -4,6 +4,9 @@
 
 * Bug fixes and internal improvements.
 
+## Bugs/glitches:
+* plot() does not display certain level 2 parameters in two-level models.
+
 # Version 0.5-9
 ## New features
 * This release contains bug fixes and internal improvements to how model covariance matrices are handled.
