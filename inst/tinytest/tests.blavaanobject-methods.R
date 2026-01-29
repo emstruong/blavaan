@@ -3,6 +3,8 @@ if(requireNamespace("rstan", quietly = TRUE) &
   load(system.file("testdata", "sysdata.rda", package="blavaan"))
   library("lavaan", quietly = TRUE)
 
+  options(mc.cores = 1L)
+  
   # classes
   expect_equal(class(fitjags@external), "list")
   expect_equal(class(fitstan@external), "list")
