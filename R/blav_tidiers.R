@@ -12,105 +12,120 @@ generics::glance
 
 #' Tidy a blavaan object
 #'
-#' @param x A \code{blavaan} object
+#' @param x A \code{blavaan} object.
+#' @param summary.type The posterior summary statistic to use as the point
+#'   estimate. One of \code{"mean"} (posterior mean, default), \code{"median"}
+#'   (posterior median), or \code{"mode"} (posterior mode). Fixed and
+#'   constrained parameters always use the posterior mean regardless.
 #' @param conf.int Logical indicating whether to include credible intervals.
 #'   Default is \code{TRUE}.
-#' @param conf.level The probability mass to include in the credible interval.
-#'   Default is 0.95.
-#' @param conf.method Method for computing credible intervals. Either "quantile"
-#'   (equal-tailed interval) or "HPDinterval" (highest posterior density).
-#'   Default is "quantile".
 #' @param standardized Logical indicating whether to include standardized
-#'   estimates. Default is \code{FALSE}.
+#'   estimates. Only supported when \code{summary.type = "mean"}.
+#'   Default is \code{FALSE}.
 #' @param rhat Logical indicating whether to include the Rhat convergence
 #'   diagnostic. Default is \code{TRUE}.
 #' @param ess Logical indicating whether to include the effective sample size.
 #'   Default is \code{TRUE}.
-#' @param ... Additional arguments (currently ignored).
+#' @param priors Logical indicating whether to include the prior distribution
+#'   specification. Default is \code{TRUE}.
+#' @param ... Additional arguments passed to \code{summary()}.
 #'
-#' @return A \code{tibble} (if available) or \code{data.frame} with columns:
+#' @return A \code{data.frame} with columns:
 #'   \item{term}{Parameter name (lhs, op, rhs combined)}
 #'   \item{op}{Operator from the model syntax}
-#'   \item{estimate}{Posterior mean}
+#'   \item{estimate}{Posterior summary statistic determined by \code{summary.type}}
 #'   \item{std.error}{Posterior standard deviation}
-#'   \item{conf.low}{Lower bound of credible interval (if \code{conf.int = TRUE})}
-#'   \item{conf.high}{Upper bound of credible interval (if \code{conf.int = TRUE})}
+#'   \item{conf.low}{Lower bound of 95\% credible interval (if \code{conf.int = TRUE})}
+#'   \item{conf.high}{Upper bound of 95\% credible interval (if \code{conf.int = TRUE})}
 #'   \item{std.all}{Standardized estimate (if \code{standardized = TRUE})}
 #'   \item{rhat}{Rhat convergence diagnostic (if \code{rhat = TRUE})}
 #'   \item{ess}{Effective sample size (if \code{ess = TRUE})}
-#'   \item{prior}{Prior distribution specification}
+#'   \item{prior}{Prior distribution specification (if \code{priors = TRUE})}
 #'   \item{group}{Group number (for multigroup models)}
 #'
+#' @importFrom generics tidy
 #' @examples
 #' \dontrun{
 #' data(HolzingerSwineford1939, package = "lavaan")
-#' 
+#'
 #' HS.model <- 'visual =~ x1 + x2 + x3'
-#' fit <- bcfa(HS.model, data = HolzingerSwineford1939, seed = 123)
+#' fit <- bcfa(HS.model, data = HolzingerSwineford1939, seed = 123,
+#'             n.chains = 1, sample = 300)
 #' tidy(fit)
-#' tidy(fit, conf.int = TRUE, conf.level = 0.95)
+#' tidy(fit, summary.type = "median")
 #' tidy(fit, standardized = TRUE)
 #' }
 #'
 #' @export
-tidy.blavaan <- function(x, conf.int = TRUE, conf.level = 0.95,
-                         conf.method = c("quantile", "HPDinterval"),
-                         standardized = FALSE, rhat = TRUE, ess = TRUE, ...) {
+tidy.blavaan <- function(x, summary.type = c('mean', 'median', 'mode'),
+                          conf.int = TRUE, standardized = FALSE,
+                         rhat = TRUE, ess = TRUE, priors = TRUE, ...) {
 
-  conf.method <- match.arg(conf.method)
+  summary.type <- match.arg(summary.type)
 
   # Get parameter estimates
-  PE <- parameterEstimates(x, se = TRUE, zstat = FALSE, pvalue = FALSE,
-                           ci = FALSE, standardized = standardized,
-                           remove.eq = FALSE, remove.system.eq = TRUE,
-                           remove.ineq = FALSE, remove.def = FALSE)
+  PE <- summary(
+    x,
+    header = FALSE,
+    print = FALSE,
+    standardized = standardized,
+    neff = ess,
+    postmedian = summary.type == "median",
+    postmode = summary.type == "mode",
+    ci = conf.int,
+    priors = priors
+  )
 
   # Build the base data frame
   result <- data.frame(
     term = paste0(PE$lhs, PE$op, PE$rhs),
     op = PE$op,
     estimate = PE$est,
-    std.error = PE$se,
+    std.error = PE$Post.SD,
     stringsAsFactors = FALSE
   )
 
-  # Add credible intervals if requested
-  if (conf.int) {
-    ci_bounds <- compute_blavaan_ci(x, conf.level, conf.method)
-    if (!is.null(ci_bounds)) {
-      result$conf.low <- ci_bounds$lower
-      result$conf.high <- ci_bounds$upper
-    } else {
-      result$conf.low <- NA_real_
-      result$conf.high <- NA_real_
-    }
+  # Substitute estimate based on summary.type
+  if (summary.type == "median") {
+    PE$Post.Med[is.na(PE$Post.Med)] <- PE$est[is.na(PE$Post.Med)]
+    result$estimate <- PE$Post.Med
+  } else if (summary.type == "mode") {
+    PE$Post.Mode[is.na(PE$Post.Mode)] <- PE$est[is.na(PE$Post.Mode)]
+    result$estimate <- PE$Post.Mode
+  }
+
+  # If conf.int = TRUE, add confidence interval
+  if (isTRUE(conf.int)) {
+    result$conf.low <- as.numeric(PE$pi.lower)
+    result$conf.high <- as.numeric(PE$pi.upper)
   }
 
   # Add standardized estimates if requested
-  if (standardized && "std.all" %in% names(PE)) {
+  if (isTRUE(standardized)) {
     result$std.all <- PE$std.all
   }
 
-  # Add Rhat if requested
-  if (rhat) {
-    result$rhat <- get_blavaan_rhat(x, PE)
+  # Add rhat from PE, if rhat = TRUE
+  if (isTRUE(rhat)) {
+    result$rhat <- as.numeric(PE$Rhat)
   }
 
   # Add effective sample size if requested
-  if (ess) {
-    result$ess <- get_blavaan_ess(x, PE)
+  if (isTRUE(ess)) {
+    result$ess <- PE$neff
   }
 
   # Add prior information
-  result$prior <- get_blavaan_priors(x, PE)
+  if (isTRUE(priors)) {
+    result$prior <- PE$prior
+  }
 
   # Add group information for multigroup models
-  if ("group" %in% names(PE)) {
+  if ("group" %in% names(parameterEstimates(x))) {
     result$group <- PE$group
   }
 
-  # Convert to tibble if available
-  as_blavaan_tibble(result)
+  return(result)
 }
 
 
@@ -239,179 +254,5 @@ glance.blavaan <- function(x, fit.indices = "none", ...) {
     }
   }
 
-  as_blavaan_tibble(result)
-}
-
-
-# Helper function to compute credible intervals
-compute_blavaan_ci <- function(x, conf.level = 0.95, method = "quantile") {
-
-  jagtarget <- lavInspect(x, "options")$target == "jags"
-  newpt <- x@ParTable
-  if (!("group" %in% names(newpt))) newpt$group <- rep(1, length(newpt$lhs))
-  if (!("level" %in% names(newpt))) newpt$level <- rep("within", length(newpt$lhs))
-  newpt$group[newpt$group == 0] <- 1
-
-  # Get parameter entries
-  if (jagtarget) {
-    pte2 <- which(!is.na(newpt$jagpnum))
-  } else {
-    pte2 <- which(newpt$free > 0)
-  }
-
-  # Get parameter estimates for matching
-  PE <- parameterEstimates(x, se = FALSE, zstat = FALSE, pvalue = FALSE,
-                           ci = FALSE, remove.eq = FALSE, remove.system.eq = TRUE,
-                           remove.ineq = FALSE, remove.def = FALSE)
-  if (!("group" %in% names(PE))) PE$group <- 1
-  if (!("level" %in% names(PE))) PE$level <- "within"
-  PE$group[PE$group == 0] <- 1
-
-  peentry <- match(
-    paste(newpt$lhs[pte2], newpt$op[pte2], newpt$rhs[pte2],
-          newpt$group[pte2], newpt$level[pte2], sep = ""),
-    paste(PE$lhs, PE$op, PE$rhs, PE$group, PE$level, sep = "")
-  )
-
-  # Initialize CI vectors
-  ci_lower <- rep(NA_real_, nrow(PE))
-  ci_upper <- rep(NA_real_, nrow(PE))
-
-  if (method == "HPDinterval") {
-    # Use HPD intervals
-    hpd <- tryCatch(
-      blavInspect(x, "hpd", level = conf.level),
-      error = function(e) NULL
-    )
-    if (!is.null(hpd)) {
-      ci_lower[peentry] <- hpd[, "lower"]
-      ci_upper[peentry] <- hpd[, "upper"]
-    }
-  } else {
-    # Use quantile intervals
-    alpha <- (1 - conf.level) / 2
-    probs <- c(alpha, 1 - alpha)
-
-    if (jagtarget) {
-      if (!is.null(x@external$mcmcout$HPD)) {
-        # JAGS stores 95% intervals
-        if (conf.level == 0.95 && 'Lower95' %in% colnames(x@external$mcmcout$HPD)) {
-          ci_lower[peentry] <- x@external$mcmcout$HPD[newpt$jagpnum[pte2], 'Lower95']
-          ci_upper[peentry] <- x@external$mcmcout$HPD[newpt$jagpnum[pte2], 'Upper95']
-        } else {
-          # Compute from MCMC samples
-          draws <- blavInspect(x, "mcmc")
-          draws <- do.call("rbind", draws)
-          ci_bounds <- t(apply(draws, 2, quantile, probs = probs))
-          ci_lower[peentry] <- ci_bounds[, 1]
-          ci_upper[peentry] <- ci_bounds[, 2]
-        }
-      }
-    } else {
-      # Stan
-      parsumm <- rstan::summary(x@external$mcmcout)
-      pct_cols <- paste0(probs * 100, "%")
-      if (all(pct_cols %in% colnames(parsumm$summary))) {
-        ci_lower[peentry] <- parsumm$summary[newpt$stansumnum[pte2], pct_cols[1]]
-        ci_upper[peentry] <- parsumm$summary[newpt$stansumnum[pte2], pct_cols[2]]
-      } else if (conf.level == 0.95 && all(c("2.5%", "97.5%") %in% colnames(parsumm$summary))) {
-        ci_lower[peentry] <- parsumm$summary[newpt$stansumnum[pte2], "2.5%"]
-        ci_upper[peentry] <- parsumm$summary[newpt$stansumnum[pte2], "97.5%"]
-      } else {
-        # Compute from MCMC samples
-        draws <- blavInspect(x, "mcmc")
-        draws <- do.call("rbind", draws)
-        ci_bounds <- t(apply(draws, 2, quantile, probs = probs))
-        ci_lower[peentry] <- ci_bounds[, 1]
-        ci_upper[peentry] <- ci_bounds[, 2]
-      }
-    }
-  }
-
-  list(lower = ci_lower, upper = ci_upper)
-}
-
-
-# Helper function to get Rhat values matched to parameter estimates
-get_blavaan_rhat <- function(x, PE) {
-  rhat_vals <- tryCatch(
-    blavInspect(x, "rhat"),
-    error = function(e) NULL
-  )
-
-  if (is.null(rhat_vals)) {
-    return(rep(NA_real_, nrow(PE)))
-  }
-
-  rhat_result <- rep(NA_real_, nrow(PE))
-  rhat_names <- names(rhat_vals)
-
-  # Match by parameter label
-  pe_labels <- paste0(PE$lhs, PE$op, PE$rhs)
-  matched_idx <- match(pe_labels, rhat_names)
-  rhat_result[!is.na(matched_idx)] <- rhat_vals[matched_idx[!is.na(matched_idx)]]
-
-  rhat_result
-}
-
-
-# Helper function to get effective sample size matched to parameter estimates
-get_blavaan_ess <- function(x, PE) {
-  ess_vals <- tryCatch(
-    blavInspect(x, "neff"),
-    error = function(e) NULL
-  )
-
-  if (is.null(ess_vals)) {
-    return(rep(NA_real_, nrow(PE)))
-  }
-
-  ess_result <- rep(NA_real_, nrow(PE))
-  ess_names <- names(ess_vals)
-
-  # Match by parameter label
-  pe_labels <- paste0(PE$lhs, PE$op, PE$rhs)
-  matched_idx <- match(pe_labels, ess_names)
-  ess_result[!is.na(matched_idx)] <- ess_vals[matched_idx[!is.na(matched_idx)]]
-
-  ess_result
-}
-
-
-# Helper function to get prior specifications matched to parameter estimates
-get_blavaan_priors <- function(x, PE) {
-  pt <- x@ParTable
-  prior_result <- rep(NA_character_, nrow(PE))
-
-  if (!("prior" %in% names(pt))) {
-    return(prior_result)
-  }
-
-  # Match parameters
-  pe_labels <- paste0(PE$lhs, PE$op, PE$rhs)
-  pt_labels <- paste0(pt$lhs, pt$op, pt$rhs)
-
-  if ("group" %in% names(PE) && "group" %in% names(pt)) {
-    pe_labels <- paste0(pe_labels, ".g", PE$group)
-    pt_labels <- paste0(pt_labels, ".g", pt$group)
-  }
-
-  matched_idx <- match(pe_labels, pt_labels)
-  prior_result[!is.na(matched_idx)] <- pt$prior[matched_idx[!is.na(matched_idx)]]
-
-  # Replace empty strings with NA
-  prior_result[prior_result == ""] <- NA_character_
-
-  prior_result
-}
-
-
-# Helper function to convert to tibble if available
-as_blavaan_tibble <- function(x) {
-  if (requireNamespace("tibble", quietly = TRUE)) {
-    tibble::as_tibble(x)
-  } else {
-    class(x) <- c("tbl_df", "tbl", "data.frame")
-    x
-  }
+  return(result)
 }
