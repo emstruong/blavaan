@@ -11,6 +11,8 @@ generics::tidy
 generics::glance
 
 #' Tidy a blavaan object
+#' 
+#' This function repackages the output from \code{summary()} into a friendly \code{data.frame}.
 #'
 #' @param x A \code{blavaan} object.
 #' @param summary.type The posterior summary statistic to use as the point
@@ -85,6 +87,12 @@ tidy.blavaan <- function(x, summary.type = c('mean', 'median', 'mode'),
     stringsAsFactors = FALSE
   )
 
+  # Add group information for multigroup models
+  if ("group" %in% names(parameterEstimates(x))) {
+    result$group <- PE$group
+    result <- result[, c('term', 'op', 'group', 'estimate', 'std.error')]
+  }
+
   # Substitute estimate based on summary.type
   if (summary.type == "median") {
     PE$Post.Med[is.na(PE$Post.Med)] <- PE$est[is.na(PE$Post.Med)]
@@ -118,11 +126,6 @@ tidy.blavaan <- function(x, summary.type = c('mean', 'median', 'mode'),
   # Add prior information
   if (isTRUE(priors)) {
     result$prior <- PE$prior
-  }
-
-  # Add group information for multigroup models
-  if ("group" %in% names(parameterEstimates(x))) {
-    result$group <- PE$group
   }
 
   return(result)
