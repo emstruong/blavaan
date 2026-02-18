@@ -1,6 +1,6 @@
 Package: blavaan
 Title: Bayesian Latent Variable Analysis
-Version: 0.5-9.1383
+Version: 0.5-10.1386
 Authors@R: c(person(given = "Edgar", family = "Merkle",
                     role = c("aut", "cre"),
                     email = "merklee@missouri.edu",
@@ -30,8 +30,7 @@ Authors@R: c(person(given = "Edgar", family = "Merkle",
              person(given = "Matthew", family="Emery", role="ctb",
                     comment = "loo moment_match"),
              person(given = c("Michael", "S."), family = "Truong",
-                    role = "ctb",
-                    comment = c("blavaan.target option", "R/blav_tidiers.R"))                    
+                    role = "ctb", comment = "options(blavaan.target)")
             )
 Description: Fit a variety of Bayesian latent variable models, including confirmatory
    factor analysis, structural equation models, and latent growth curve models. References: Merkle & Rosseel (2018) <doi:10.18637/jss.v085.i04>; Merkle et al. (2021) <doi:10.18637/jss.v100.i06>.
@@ -44,5 +43,5 @@ Suggests: runjags(>= 2.0.4-3), modeest(>= 2.3.3), rjags, cmdstanr, semTools, bla
 SystemRequirements: GNU make
 URL: https://ecmerkle.github.io/blavaan/, https://github.com/ecmerkle/blavaan
 BugReports: https://github.com/ecmerkle/blavaan/issues
-Additional_repositories: https://ecmerkle.github.io/drat
+Additional_repositories: https://stan-dev.r-universe.dev/, https://ecmerkle.github.io/drat
 Config/Needs/website: brms
