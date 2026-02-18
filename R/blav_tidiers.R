@@ -22,8 +22,7 @@ generics::glance
 #' @param conf.int Logical indicating whether to include credible intervals.
 #'   Default is \code{TRUE}.
 #' @param standardized Logical indicating whether to include standardized
-#'   estimates. Only supported when \code{summary.type = "mean"}.
-#'   Default is \code{FALSE}.
+#'   posterior mean estimates. Default is \code{FALSE}.
 #' @param rhat Logical indicating whether to include the Rhat convergence
 #'   diagnostic. Default is \code{TRUE}.
 #' @param ess Logical indicating whether to include the effective sample size.
@@ -194,7 +193,7 @@ glance.blavaan <- function(x, fit.indices = "none", ...) {
   # Get available fit measures
   if (test_available) {
     fm <- tryCatch(
-      fitMeasures(x, fit.measures = "all"),
+      blav_fit_measures(x, fit.measures = "all"),
       error = function(e) NULL
     )
 
